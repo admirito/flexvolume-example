@@ -45,6 +45,8 @@ domount() {
     MNTPATH=$1
 
     WEBDAV_SERVER=$(echo $2 | jq -r '.server')
+    USERNAME=$(echo $2 | jq -r '.username')
+    PASSWORD=$(echo $2 | jq -r '.password')
 
     if [ $(ismounted) -eq 1 ] ; then
         log '{"status": "Success"}'
@@ -53,7 +55,7 @@ domount() {
 
     mkdir -p ${MNTPATH} &> /dev/null
 
-    echo -e "anonymous\nanonymous" | mount -t davfs -o noexec  ${WEBDAV_SERVER} ${MNTPATH} &> /dev/null
+    echo -e "${USERNAME:-anonymous}\n${PASSWORD:-anonymous}" | mount -t davfs -o noexec  ${WEBDAV_SERVER} ${MNTPATH} &> /dev/null
     if [ $? -ne 0 ]; then
         err "{ \"status\": \"Failure\", \"message\": \"Failed to mount ${WEBDAV_SERVER} at ${MNTPATH}\"}"
         exit 1

@@ -6,7 +6,7 @@ and @hategan's [CSI Driver](https://github.com/whole-tale/wt-kubernetes/tree/mas
 
 Highlighs:
 * WebDav flexvolume driver is a simple bash script (minimal changes from nfs example)
-* Uses anonymous WebDav, but could easily be extended to pass credentials
+* Supports username/password to pass credentials
 * Requires `davfs` and `jq` to be installed on the host
 * Requires WebDav service IP to be used, since the host is doing the mount and can't access the Kubernetes DNS
 
@@ -62,6 +62,8 @@ Edit the `client/nginx-dav.yaml`, setting the endpoint IP/port
       fsType: "webdav"
       options:
         server: "http://<ip>:8080"
+	username: "<username>"
+	password: "<password>"
 ```
 
 

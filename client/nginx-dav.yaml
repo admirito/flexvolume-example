@@ -19,3 +19,5 @@ spec:
       fsType: "webdav"
       options:
         server: "http://10.244.0.27:8080"
+        username: "anonymous"
+        password: "anonymous"
