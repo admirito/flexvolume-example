@@ -45,8 +45,34 @@ domount() {
     MNTPATH=$1
 
     WEBDAV_SERVER=$(echo $2 | jq -r '.server')
-    USERNAME=$(echo $2 | jq -r '.username')
-    PASSWORD=$(echo $2 | jq -r '.password')
+    USERNAME=$(echo $2 | jq -re '.username') || USERNAME=
+    PASSWORD=$(echo $2 | jq -re '.password') || PASSWORD=
+    K8S_SECRET_NAMESPACE=$(echo $2 | jq -re '.secretNamespace') || K8S_SECRET_NAMESPACE=
+    K8S_SECRET_NAME=$(echo $2 | jq -re '.secretName') || K8S_SECRET_NAME=
+
+    if [ -n "$USERNAME" ] && [ -z "$PASSWORD" ]; then
+	PASSWORD=$(kubectl -n ${K8S_SECRET_NAMESPACE:-default} get secret ${K8S_SECRET_NAME:-webdav} --no-headers -o=custom-columns=NAME:.data.webdav-password 2>/dev/null | sed 's/^<none>$//' | base64 --decode) || PASSWORD=
+    fi
+
+    if [ -n "$K8S_SECRET_NAME" ]; then
+	CA_CERT=$(kubectl -n ${K8S_SECRET_NAMESPACE:-default} get secret ${K8S_SECRET_NAME} --no-headers -o=custom-columns=NAME:.data.webdav-ca-cert | sed 's/^<none>$//' 2>/dev/null | base64 --decode) || CA_CERT=
+	SERVER_CERT=$(kubectl -n ${K8S_SECRET_NAMESPACE:-default} get secret ${K8S_SECRET_NAME} --no-headers -o=custom-columns=NAME:.data.webdav-cert 2>/dev/null | sed 's/^<none>$//' | base64 --decode) || SERVER_CERT=
+    fi
+
+    if [ -n "$CA_CERT" ] || [ -n "$SERVER_CERT" ]; then
+	CONF_FILE=$(tempfile)
+	CONF_ARG=",conf=$CONF_FILE"
+	if [ -n "$CA_CERT" ]; then
+	    CA_CERT_FILE=$(tempfile -m 644)
+	    echo "$CA_CERT" > "$CA_CERT_FILE"
+	    echo "trust_ca_cert $CA_CERT_FILE" >> "$CONF_FILE"
+	fi
+	if [ -n "$SERVER_CERT" ]; then
+	    SERVER_CERT_FILE=$(tempfile -m 644)
+	    echo "$SERVER_CERT" > "$SERVER_CERT_FILE"
+	    echo "trust_server_cert $SERVER_CERT_FILE" >> "$CONF_FILE"
+	fi
+    fi
 
     if [ $(ismounted) -eq 1 ] ; then
         log '{"status": "Success"}'
@@ -55,8 +81,15 @@ domount() {
 
     mkdir -p ${MNTPATH} &> /dev/null
 
-    echo -e "${USERNAME:-anonymous}\n${PASSWORD:-anonymous}" | mount -t davfs -o noexec  ${WEBDAV_SERVER} ${MNTPATH} &> /dev/null
-    if [ $? -ne 0 ]; then
+    echo -e "${USERNAME:-anonymous}\n${PASSWORD:-anonymous}" | mount -t davfs -o noexec${CONF_ARG}  ${WEBDAV_SERVER} ${MNTPATH} &> /dev/null
+
+    STATUS=$?
+
+    [ -n "$CONF_FILE" ] && rm -f "$CONF_FILE"
+    [ -n "$CA_CERT_FILE" ] && rm -f "$CA_CERT_FILE"
+    [ -n "$SERVER_CERT_FILE" ] && rm -f "$SERVER_CERT_FILE"
+
+    if [ $STATUS -ne 0 ]; then
         err "{ \"status\": \"Failure\", \"message\": \"Failed to mount ${WEBDAV_SERVER} at ${MNTPATH}\"}"
         exit 1
     fi

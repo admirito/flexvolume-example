@@ -64,6 +64,13 @@ Edit the `client/nginx-dav.yaml`, setting the endpoint IP/port
         server: "http://<ip>:8080"
 	username: "<username>"
 	password: "<password>"
+	## or you can provide a k8s secret instead of password
+	## (requires kubectl to be installed and configured)
+	## the secret cloud be created with this command:
+	## kubectl create secret generic <secret name> \
+	##         --from-literal=webdav-password=<password>
+	# secretNamespace: "<k8s namespace>"
+	# secretName: "<secret name>"
 ```
 
 
